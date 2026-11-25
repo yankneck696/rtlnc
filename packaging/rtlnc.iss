@@ -20,6 +20,10 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequiredOverridesAllowed=dialog
+; rtlnc's helper processes have no windows, so "please close the app" can't
+; work: Setup ends any running rtlnc.exe itself (see [Code]).
+CloseApplications=force
+RestartApplications=no
 
 [Files]
 Source: "..\dist\rtlnc\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -33,6 +37,28 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Run]
 Filename: "{app}\rtlnc.exe"; Description: "Start rtlnc now"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure EndRunningRtlnc();
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM rtlnc.exe', '', SW_HIDE,
+       ewWaitUntilTerminated, ResultCode);
+  Sleep(500);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  EndRunningRtlnc();
+  Result := '';
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  EndRunningRtlnc();
+  Result := True;
+end;
 
 [Messages]
 FinishedLabel=Setup has finished.%n%nFirst time with RTL-SDR on this PC? Each dongle needs the WinUSB driver once: run Zadig (zadig.akeo.ie), Options > List All Devices, pick "Bulk-In, Interface (Interface 0)", choose WinUSB, Install Driver.

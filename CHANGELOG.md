@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+- Fix: closing the launcher window could leave rtlnc running invisibly in
+  the background (Edge keeps its process alive after the window closes),
+  which then blocked updating ("rtlnc is still running"). The launcher now
+  follows its window, not the Edge process, and every helper process exits
+  by itself if the launcher is gone.
+- Installer and uninstaller now close any running rtlnc themselves.
+
 ## 0.3.1
 - Launcher: pressing Start without dongles set up now explains what to do
   (plug in / Zadig / set roles / Demo mode) instead of failing in the log.

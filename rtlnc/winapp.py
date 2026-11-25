@@ -43,6 +43,43 @@ def _setup_log() -> None:
         sys.stdout = sys.stderr = open(os.devnull, "w")
 
 
+def _pid_alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        import ctypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x00100000, False, pid)        # SYNCHRONIZE
+        if not h:
+            return False
+        try:
+            return k.WaitForSingleObject(h, 0) == 0x102    # WAIT_TIMEOUT = still running
+        finally:
+            k.CloseHandle(h)
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def _watch_parent() -> None:
+    """Started by the launcher? Then quit if the launcher disappears, so no
+    hidden rtlnc.exe is ever left running (and holding the dongles)."""
+    pid = os.environ.get("RTLNC_PARENT_PID")
+    if not pid:
+        return
+    import threading
+    import time
+
+    def loop():
+        while _pid_alive(int(pid)):
+            time.sleep(2)
+        print("launcher is gone; exiting")
+        os._exit(0)
+    threading.Thread(target=loop, daemon=True).start()
+
+
 SUBCOMMANDS = {
     "core": ("rtlnc.app", "run"), "run": ("rtlnc.app", "run"),
     "check": ("rtlnc.app", "check"), "list": ("rtlnc.app", "list"),
@@ -56,6 +93,7 @@ def main() -> None:
     _setup_dlls()
     if len(sys.argv) > 1 and sys.argv[1] in SUBCOMMANDS:
         _setup_log()
+        _watch_parent()
         mod, first = SUBCOMMANDS[sys.argv[1]]
         rest = sys.argv[2:]
         import importlib

@@ -76,7 +76,8 @@ class Proc:
         self.name, self.cmd = name, cmd
         self.log = logdir / f"{name}.log"
         self.log.write_text("")
-        env = dict(os.environ, RTLNC_LOG=str(self.log), PYTHONUNBUFFERED="1")
+        env = dict(os.environ, RTLNC_LOG=str(self.log), PYTHONUNBUFFERED="1",
+                   RTLNC_PARENT_PID=str(os.getpid()))
         kw = {"creationflags": CREATE_NO_WINDOW} if sys.platform == "win32" else {}
         self.p = subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kw)
@@ -122,6 +123,7 @@ class Launcher:
         self.edge = None                     # msedge.exe path (Windows app windows)
         self.edge_profile = devconfig.config_dir() / "window-profile"
         self.last_seen = time.time()
+        self.bye_at: float | None = None      # window said goodbye at this time
         self.rig_err: str | None = None
         self.rig_freq: str | None = None
         threading.Thread(target=self._pump_logs, daemon=True).start()
@@ -370,6 +372,7 @@ def make_handler(L: Launcher, page: bytes):
                 self.wfile.write(page)
             elif p == "/api/state":
                 L.last_seen = time.time()
+                L.bye_at = None
                 st = L.status
                 self._json({"settings": L.s, "running": L.running(),
                             "rig": {"err": L.rig_err, "freq": L.rig_freq},
@@ -402,6 +405,9 @@ def make_handler(L: Launcher, page: bytes):
                             L.bus.send({"cmd": "listen", "freq": float(body["freq_mhz"]) * 1e6})
                         if "mode" in body:
                             L.bus.send({"cmd": "demod", "mode": body["mode"]})
+                    self._json({"ok": True})
+                elif p == "/api/bye":                 # window closing (or reloading)
+                    L.bye_at = time.time()
                     self._json({"ok": True})
                 elif p == "/api/start":
                     try:
@@ -446,6 +452,22 @@ def find_edge() -> str | None:
     return shutil.which("msedge")
 
 
+# How long the launcher waits after the window closes before shutting down
+# everything. "bye" is sent when the window closes; a reload sends a new poll
+# within the grace time. The heartbeat timeout covers a window that vanished
+# without saying goodbye. It is long because browsers poll only about once a
+# minute in a minimised window.
+BYE_GRACE_S = 4.0
+HEARTBEAT_TIMEOUT_S = 150.0
+
+
+def window_closed(L: "Launcher", now: float | None = None) -> bool:
+    now = time.time() if now is None else now
+    if L.bye_at is not None and now - L.bye_at > BYE_GRACE_S and L.last_seen <= L.bye_at:
+        return True
+    return now - L.last_seen > HEARTBEAT_TIMEOUT_S
+
+
 def main(argv=None) -> None:
     import argparse
     ap = argparse.ArgumentParser(prog="rtlnc-launcher")
@@ -460,15 +482,14 @@ def main(argv=None) -> None:
     try:
         L.edge = None if a.browser else find_edge()
         if L.edge:
-            # own profile = own Edge process, which ends when the last window closes
             L.edge_profile.mkdir(parents=True, exist_ok=True)
-            w = subprocess.Popen([L.edge, f"--app={url}", f"--user-data-dir={L.edge_profile}",
-                                  "--window-size=1120,860", "--no-first-run",
-                                  "--disable-features=Translate"])
-            w.wait()
-            # Edge can hand the window to an already-running instance of the same
-            # profile; stay alive while the launcher page is still being polled
-            while time.time() - L.last_seen < 5:
+            # Don't wait for the Edge process: with Edge's background mode or
+            # startup boost it can outlive the window. Watch the page instead.
+            subprocess.Popen([L.edge, f"--app={url}", f"--user-data-dir={L.edge_profile}",
+                              "--window-size=1120,860", "--no-first-run",
+                              "--disable-features=Translate", "--disable-background-mode"])
+            L.last_seen = time.time() + 30          # allow time for the window to appear
+            while not window_closed(L):
                 time.sleep(1)
         else:
             webview = None
@@ -485,7 +506,8 @@ def main(argv=None) -> None:
             else:
                 print(f"rtlnc launcher: {url}")
                 webbrowser.open(url)
-                while True:
+                L.last_seen = time.time() + 60
+                while not window_closed(L):
                     time.sleep(1)
     except KeyboardInterrupt:
         pass

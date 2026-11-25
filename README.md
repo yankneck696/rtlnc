@@ -398,6 +398,9 @@ None of this has been measured on real dongles yet.
 
 ## 9. Troubleshooting
 
+* **Installer says rtlnc is still running** (only with 0.3.0/0.3.1): restart
+  the PC, or Task Manager → *Details* → end every `rtlnc.exe`. From 0.3.2 the
+  installer does this itself.
 * **The installer "does nothing" when you click download**: your browser
   blocked it; see section 1, step 1 (Ctrl + J → Keep).
 * **Start says dongles have no roles**: open *Dongles & serials…* and run

@@ -281,6 +281,9 @@ $("openDev").onclick = () => {
 };
 $("openLogs").onclick = () => api("/api/open", {what:"logs"}).catch(() => {});
 
+// tell the launcher when this window closes, so it stops everything at once
+addEventListener("pagehide", () => navigator.sendBeacon("/api/bye", "{}"));
+
 (async () => {
   S = (await api("/api/state")).settings;
   O = await api("/api/options");
