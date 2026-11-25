@@ -70,7 +70,8 @@ jobs:
           if ($exists) { Write-Host "v$env:VERSION already released" }
           else {
             "NEW_RELEASE=1" >> $env:GITHUB_ENV
-            python packaging/release_notes.py $env:VERSION > release-notes.md
+            python packaging/release_notes.py $env:VERSION release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw "release notes failed" }
           }
       - name: Publish release (new version on main)
         if: env.NEW_RELEASE == '1'
