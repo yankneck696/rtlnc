@@ -1,0 +1,38 @@
+[project]
+name = "rtlnc"
+version = "0.3.0"
+description = "Multi-dongle RTL-SDR Blog V4 phasing noise canceller, 0.5-450 MHz (HF to 70 cm), independent clocks"
+requires-python = ">=3.9"
+license = {text = "GPL-3.0-or-later"}
+readme = "README.md"
+keywords = ["rtl-sdr", "sdr", "ham radio", "noise canceller", "phasing", "MFJ-1026"]
+
+dependencies = ["numpy>=1.22", "scipy>=1.8", "pyrtlsdr>=0.3", "sounddevice>=0.4", "pyserial>=3.5"]
+
+[project.urls]
+Homepage = "https://github.com/yankneck696/rtlnc"
+Issues = "https://github.com/yankneck696/rtlnc/issues"
+
+[project.optional-dependencies]
+test = ["pytest"]
+window = ["pywebview>=5"]
+
+[project.scripts]
+rtlnc = "rtlnc.app:main"
+rtlnc-app = "rtlnc.winapp:main"
+rtlnc-tcp = "rtlnc.addons.tcp:main"
+rtlnc-sound = "rtlnc.addons.sound:main"
+rtlnc-rig = "rtlnc.addons.rig:main"
+rtlnc-panel = "rtlnc.addons.panel:main"
+rtlnc-devices = "rtlnc.addons.devices:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["rtlnc", "rtlnc.addons"]
+
+[tool.setuptools.package-data]
+"rtlnc" = ["launcher.html"]
+"rtlnc.addons" = ["panel.html", "devices.html"]

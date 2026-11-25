@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rtlnc</title>
+<style>
+  :root{--bg:#121417;--panel:#1b1e23;--panel2:#22262c;--line:#2f343b;--ink:#e6e8eb;--dim:#8b929c;
+    --amber:#f0a73a;--teal:#3cc7b4;--red:#e5534b;--green:#57c26a;--mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .brand{font-weight:700;letter-spacing:.06em;font-size:16px}.brand small{color:var(--dim);font-weight:400;letter-spacing:0;font-size:13px}
+  .pill{padding:3px 10px;border-radius:999px;font:600 12px var(--mono);border:1px solid var(--line)}
+  .pill.ok{color:var(--green);border-color:#2d5a36}.pill.warn{color:var(--amber);border-color:#6a4a1c}
+  .pill.off{color:var(--dim)} .pill.bad{color:var(--red);border-color:#6a2522}
+  .spacer{flex:1}
+  #go{font:700 15px "Segoe UI",system-ui;padding:10px 26px;border-radius:9px;border:0;cursor:pointer;background:var(--teal);color:#062520;min-width:150px}
+  #go.stop{background:var(--red);color:#fff}
+  main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;padding:14px 18px}
+  @media (max-width:880px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:flex;justify-content:space-between;align-items:center}
+  label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
+  input[type=text],input[type=number],select{background:#0d0f12;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:13px var(--mono);width:100%}
+  input:focus,select:focus{outline:1px solid var(--amber)}
+  .row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+  .freq{font:600 26px var(--mono)!important;padding:8px 10px!important;letter-spacing:.02em}
+  .bands{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .bands button,.btn{background:#2a2f36;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 9px;font:600 12px "Segoe UI",system-ui;cursor:pointer}
+  .bands button:hover,.btn:hover{border-color:#4a515a}
+  .btn.primary{background:var(--amber);color:#1b1305;border-color:var(--amber);padding:9px 12px;font-size:13px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-top:8px}
+  .seg button{flex:1;background:transparent;color:var(--dim);border:0;padding:8px 0;font:700 13px "Segoe UI",system-ui;cursor:pointer}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:var(--teal);color:#062520}
+  .chk{display:flex;gap:8px;align-items:center;margin:10px 0 2px;color:var(--ink);font-size:13px}
+  .chk input{width:16px;height:16px;accent-color:var(--amber)}
+  .sub{margin-left:24px}
+  .hint{font-size:12px;color:var(--dim);margin-top:6px}
+  .warn{font-size:13px;padding:9px 11px;border-radius:8px;background:#33270f;border:1px solid #6a4a1c;margin-top:8px}
+  .err{background:#3a1715;border-color:#6a2522}
+  .ok{background:#17301c;border:1px solid #2d5a36}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td{padding:5px 4px;border-bottom:1px solid #262a30}
+  .mono{font-family:var(--mono)} .dim{color:var(--dim)}
+  .big{font:700 44px var(--mono);text-align:center;margin:6px 0 0}
+  .big small{font-size:15px;color:var(--dim);font-weight:400}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font:13px var(--mono);margin-top:8px}
+  .kv span{color:var(--dim)}
+  #logs{font:11.5px var(--mono);color:#b9c0c8;background:#0d0f12;border-radius:6px;padding:8px;height:260px;overflow:auto;white-space:pre-wrap}
+  .restart{display:none;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">rtlnc <small>multi-dongle noise canceller · RTL-SDR V4</small></div>
+  <span id="state" class="pill off">stopped</span>
+  <div class="spacer"></div>
+  <button id="go">▶ Start</button>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h3>Receive</h3>
+      <div class="row">
+        <input id="freq_mhz" class="freq" type="text" inputmode="decimal" title="MHz, 0.5–450">
+        <span class="dim" style="flex:0 0 auto;font:600 15px var(--mono)">MHz</span>
+      </div>
+      <div class="bands" id="bands"></div>
+      <div class="seg" id="mode"><button data-m="am">AM</button><button data-m="fm">FM</button><button data-m="usb">USB</button><button data-m="lsb">LSB</button><button data-m="cw">CW</button></div>
+      <label class="chk"><input type="checkbox" id="demo"> Demo mode: simulated dongles (try it without hardware)</label>
+    </div>
+
+    <div class="card">
+      <h3>Dongles <button class="btn" id="openDev">Dongles &amp; serials…</button></h3>
+      <div id="dongles" class="dim">—</div>
+    </div>
+
+    <div class="card">
+      <h3>Radio (CAT): follow your rig's frequency</h3>
+      <select id="cat">
+        <option value="none">None</option>
+        <option value="icom">Icom (CI-V)</option>
+        <option value="yaesu">Yaesu (FT-991A, FTdx10/101, FT-710, FT-891…)</option>
+        <option value="kenwood">Kenwood (TS-590, TS-890, TS-2000…)</option>
+        <option value="elecraft">Elecraft (K3, K4, KX2/KX3)</option>
+        <option value="flrig">FLRig (shared with other programs)</option>
+        <option value="rigctld">Hamlib rigctld (shared with other programs)</option>
+      </select>
+      <div id="catSerial">
+        <div class="row">
+          <div><label>COM port</label><select id="cat_port"></select></div>
+          <div style="flex:0 0 120px"><label>Baud</label><input id="cat_baud" type="text" placeholder="default"></div>
+          <div id="civBox"><label>Icom model / CI-V</label><select id="cat_civ"></select></div>
+        </div>
+        <div class="hint">Read-only: rtlnc only asks the radio its frequency and TX state. A COM port can be used by one program at a time; if WSJT-X or your logger also needs CAT, use FLRig or rigctld.</div>
+      </div>
+      <div id="catNet"><label>Address</label><input id="cat_addr" type="text" placeholder="127.0.0.1:12345"></div>
+    </div>
+
+    <div class="card">
+      <h3>Outputs</h3>
+      <label class="chk"><input type="checkbox" id="local_audio"> Listen here (speakers)</label>
+      <div class="sub"><select id="audio_device"></select></div>
+      <label class="chk"><input type="checkbox" id="tcp_on"> Feed SDR programs (rtl_tcp server)</label>
+      <div class="sub">
+        <div class="row"><div><label>Port</label><input id="tcp_port" type="number"></div><div></div></div>
+        <label class="chk"><input type="checkbox" id="tcp_tune"> SDR program may change frequency</label>
+        <label class="chk"><input type="checkbox" id="tcp_lan"> Allow other computers on my network</label>
+        <div class="hint">In SDR#, SDR++, SDR Console, GQRX, HDSDR…: choose "RTL-SDR TCP", host 127.0.0.1, port above, lowest sample rate.</div>
+      </div>
+      <label class="chk"><input type="checkbox" id="iq_on"> IQ to a sound device (HDSDR, SDR Console via virtual cable)</label>
+      <div class="sub"><div class="row"><select id="iq_device"></select><select id="iq_rate" style="flex:0 0 120px"><option>96000</option><option>192000</option></select></div></div>
+      <label class="chk"><input type="checkbox" id="aud_on"> Audio to a sound device (WSJT-X, fldigi via virtual cable)</label>
+      <div class="sub"><select id="aud_device"></select></div>
+      <label class="chk"><input type="checkbox" id="panel_lan"> Control panel reachable from tablet/phone on my network</label>
+      <div class="sub"><label>Access code</label><input id="panel_token" type="text" placeholder="required when on the network"></div>
+      <div id="restart" class="warn restart">Some changes apply the next time you press Start.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h3>Status <button class="btn primary" id="openPanel">Open control panel</button></h3>
+      <div class="big"><span id="supp">—</span><small> dB</small></div>
+      <div class="dim" style="text-align:center;font-size:12px">noise suppression</div>
+      <div class="kv">
+        <span>tuned</span><b id="kFc">—</b>
+        <span>listening</span><b id="kListen">—</b>
+        <span>mode</span><b id="kMode">—</b>
+        <span>radio</span><b id="kPtt">—</b>
+        <span>phase lock</span><b id="kFast">—</b>
+      </div>
+      <table id="chans" style="margin-top:10px"></table>
+    </div>
+    <div class="card">
+      <h3>Messages <button class="btn" id="openLogs">Log folder</button></h3>
+      <div id="logs"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let S = null, O = null, running = false, dirtyWhileRunning = false;
+const LIVE = new Set(["freq_mhz", "mode"]);
+const BANDS = [["160m",1.840,"lsb"],["80m",3.750,"lsb"],["60m",5.357,"usb"],["40m",7.160,"lsb"],["30m",10.136,"usb"],
+  ["20m",14.200,"usb"],["17m",18.130,"usb"],["15m",21.300,"usb"],["12m",24.950,"usb"],["10m",28.400,"usb"],
+  ["6m",50.125,"usb"],["2m FM",146.520,"fm"],["2m SSB",144.200,"usb"],["70cm FM",446.000,"fm"],["70cm SSB",432.100,"usb"]];
+
+async function api(path, body){
+  const r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+function setting(k, v){
+  S[k] = v;
+  if (running && !LIVE.has(k)){ dirtyWhileRunning = true; $("restart").style.display = "block"; }
+  api("/api/settings", {[k]: v}).catch(e => alert(e.message));
+}
+
+// ---------------------------------------------------------------- build controls
+function fillSelect(sel, items, cur, blank){
+  sel.innerHTML = (blank ? `<option value="">${blank}</option>` : "") +
+    items.map(([v,t]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(t)}</option>`).join("");
+}
+function initControls(){
+  $("bands").innerHTML = BANDS.map(([n,f,m]) => `<button data-f="${f}" data-m="${m}">${n}</button>`).join("");
+  $("bands").querySelectorAll("button").forEach(b => b.onclick = () => {
+    $("freq_mhz").value = (+b.dataset.f).toFixed(4); setting("freq_mhz", +b.dataset.f); setMode(b.dataset.m); });
+  $("freq_mhz").value = (+S.freq_mhz).toFixed(4);
+  $("freq_mhz").addEventListener("change", () => {
+    let v = parseFloat($("freq_mhz").value.replace(",", "."));
+    if (isNaN(v) || v < 0.5 || v > 450){ alert("Frequency must be 0.5 – 450 MHz"); $("freq_mhz").value = S.freq_mhz; return; }
+    setting("freq_mhz", v); });
+  $("freq_mhz").addEventListener("keydown", e => { if (e.key === "Enter") $("freq_mhz").blur(); });
+  $("mode").querySelectorAll("button").forEach(b => b.onclick = () => setMode(b.dataset.m));
+  showMode();
+  for (const k of ["demo","local_audio","tcp_on","tcp_tune","tcp_lan","iq_on","aud_on","panel_lan"]){
+    $(k).checked = !!S[k]; $(k).onchange = () => { setting(k, $(k).checked); showSubs(); refreshDongles(); };
+  }
+  for (const k of ["tcp_port","cat_baud","cat_addr","panel_token"]){
+    $(k).value = S[k] ?? ""; $(k).onchange = () => setting(k, k === "tcp_port" ? +$(k).value : $(k).value.trim());
+  }
+  const outs = O.sound_out.map(n => [n, n]);
+  fillSelect($("audio_device"), outs, S.audio_device, "System default");
+  fillSelect($("iq_device"), outs, S.iq_device, "— choose a (virtual) device —");
+  fillSelect($("aud_device"), outs, S.aud_device, "— choose a (virtual) device —");
+  $("iq_rate").value = String(S.iq_rate);
+  for (const k of ["audio_device","iq_device","aud_device"]) $(k).onchange = () => setting(k, $(k).value);
+  $("iq_rate").onchange = () => setting("iq_rate", +$("iq_rate").value);
+  $("cat").value = S.cat; $("cat").onchange = () => { setting("cat", $("cat").value); showCat(); };
+  fillSelect($("cat_port"), O.ports.map(([d,desc]) => [d, desc ? `${d} — ${desc}` : d]), S.cat_port, O.ports.length ? null : "no serial ports found");
+  $("cat_port").onchange = () => setting("cat_port", $("cat_port").value);
+  fillSelect($("cat_civ"), O.icom_models.map(m => [m, m]), S.cat_civ);
+  $("cat_civ").onchange = () => setting("cat_civ", $("cat_civ").value);
+  showCat(); showSubs();
+}
+function setMode(m){ setting("mode", m); showMode(); }
+function showMode(){ $("mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.m === S.mode)); }
+function showCat(){
+  const c = S.cat, serial = ["icom","yaesu","kenwood","elecraft"].includes(c);
+  $("catSerial").style.display = serial ? "" : "none";
+  $("catNet").style.display = (c === "flrig" || c === "rigctld") ? "" : "none";
+  $("civBox").style.display = c === "icom" ? "" : "none";
+  $("cat_addr").placeholder = c === "flrig" ? "127.0.0.1:12345" : "127.0.0.1:4532";
+}
+function showSubs(){
+  document.querySelectorAll(".sub").forEach(d => {
+    const box = d.previousElementSibling && d.previousElementSibling.querySelector("input[type=checkbox]");
+    if (box) d.style.display = box.checked ? "" : "none";
+  });
+}
+
+// ---------------------------------------------------------------- dongles
+async function refreshDongles(){
+  if (running){ $("dongles").innerHTML = `<span class="dim">In use by the canceller.</span>`; return; }
+  if (S.demo){ $("dongles").innerHTML = `<span class="dim">Demo mode: one simulated main dongle and two aux dongles.</span>`; return; }
+  const list = await api("/api/dongles").catch(e => [{error:e.message}]);
+  if (list.length && list[0].error){
+    $("dongles").innerHTML = `<div class="warn err">${esc(list[0].error)}</div>`; return; }
+  if (!list.length){
+    $("dongles").innerHTML = `<div class="warn">No RTL-SDR found. Plug in your V4 dongles. First time on this PC? Install the WinUSB driver for each one with <b>Zadig</b> (Options → List All Devices → "Bulk-In, Interface (Interface 0)" → WinUSB → Install).</div>`; return; }
+  const rows = list.map(d => `<tr><td class="mono">${esc(d.serial)}</td><td>${esc(d.name) || '<span class="dim">no name</span>'}</td>
+    <td class="mono">${esc(d.role) || '<span class="dim">—</span>'}</td><td>${d.v4 ? '<span class="pill ok">V4</span>' : '<span class="pill bad">not V4</span>'}</td></tr>`).join("");
+  const sers = list.map(d => d.serial), dup = sers.some((s,i) => sers.indexOf(s) !== i);
+  const hasMain = list.some(d => d.role === "main"), nAux = list.filter(d => /^aux\d/.test(d.role)).length;
+  let msg = "";
+  if (dup) msg = `<div class="warn">Several dongles share a serial. Open <b>Dongles &amp; serials…</b> and run the numbering wizard.</div>`;
+  else if (!hasMain || !nAux) msg = `<div class="warn">Give one dongle the role <b>main</b> and at least one <b>aux1</b> in <b>Dongles &amp; serials…</b></div>`;
+  else msg = `<div class="hint">Main + ${nAux} aux: up to ${nAux} noise source${nAux > 1 ? "s" : ""} can be nulled.</div>`;
+  $("dongles").innerHTML = `<table>${rows}</table>${msg}`;
+}
+
+// ---------------------------------------------------------------- status / logs
+const mhz = f => f ? (f/1e6).toFixed(4) + " MHz" : "—";
+async function poll(){
+  let st;
+  try { st = await api("/api/state"); } catch { return; }
+  const wasRunning = running;
+  running = st.running;
+  const s = st.status || {}, pill = $("state");
+  if (!running){ pill.className = "pill off"; pill.textContent = "stopped"; }
+  else if (s.state === "track"){ pill.className = "pill ok"; pill.textContent = S.demo ? "running (demo)" : "running"; }
+  else { pill.className = "pill warn"; pill.textContent = "acquiring…"; }
+  $("go").textContent = running ? "■ Stop" : "▶ Start"; $("go").classList.toggle("stop", running);
+  $("openPanel").disabled = !running;
+  if (!running){ dirtyWhileRunning = false; $("restart").style.display = "none"; }
+  $("supp").textContent = s.cancel_db != null ? s.cancel_db.toFixed(1) : "—";
+  $("kFc").textContent = mhz(s.fc); $("kListen").textContent = mhz(s.listen);
+  $("kMode").textContent = s.demod ? s.demod.toUpperCase() : "—";
+  const rg = st.rig || {};
+  $("kPtt").textContent = S.cat === "none" ? "no CAT (set below)" : !st.procs.rig ? "—" :
+    rg.err ? "can't reach radio: " + rg.err : s.ptt ? "TRANSMITTING (canceller held)" :
+    rg.freq ? "following, " + rg.freq : "connecting…";
+  $("kPtt").style.color = rg.err && st.procs.rig ? "var(--amber)" : "";
+  $("kFast").textContent = s.fast_on == null ? "—" : s.fast_on ? "on" : "off (HF)";
+  $("chans").innerHTML = (s.channels || []).map(c => `<tr><td class="mono">AUX ${c.ch}</td><td>${esc(c.name || "")}</td>
+     <td class="mono">${c.mode}</td><td class="mono">coh ${c.coh.toFixed(2)}</td><td class="mono">${c.ppm >= 0 ? "+" : ""}${c.ppm.toFixed(2)} ppm</td></tr>`).join("");
+  const box = $("logs"), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+  box.textContent = st.logs.join("\n");
+  if (atEnd) box.scrollTop = box.scrollHeight;
+  if (wasRunning !== running) refreshDongles();
+}
+
+$("go").onclick = async () => {
+  $("go").disabled = true;
+  try { await api(running ? "/api/stop" : "/api/start", {}); } catch (e){ alert(e.message); }
+  setTimeout(() => { $("go").disabled = false; poll(); }, 600);
+};
+$("openPanel").onclick = () => api("/api/open", {what:"panel"}).catch(e => alert(e.message));
+$("openDev").onclick = () => {
+  if (running && !confirm("The dongle editor needs the dongles: stop the canceller?")) return;
+  api("/api/open", {what:"devices"}).catch(e => alert(e.message));
+};
+$("openLogs").onclick = () => api("/api/open", {what:"logs"}).catch(() => {});
+
+(async () => {
+  S = (await api("/api/state")).settings;
+  O = await api("/api/options");
+  initControls(); refreshDongles(); poll();
+  setInterval(poll, 700);
+})();
+</script>
+</body>
+</html>

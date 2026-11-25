@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rtlnc · dongles</title>
+<style>
+  :root{--bg:#121417;--panel:#1b1e23;--panel2:#22262c;--line:#2f343b;--ink:#e6e8eb;--dim:#8b929c;
+    --amber:#f0a73a;--teal:#3cc7b4;--red:#e5534b;--green:#57c26a;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{font-weight:700;letter-spacing:.06em}.brand small{color:var(--dim);font-weight:400;letter-spacing:0}
+  .stat{font:13px var(--mono);color:var(--dim)} .stat b{color:var(--ink)}
+  .pill{padding:2px 8px;border-radius:999px;font:600 12px var(--mono);border:1px solid var(--line)}
+  .pill.warn{color:var(--amber);border-color:#6a4a1c}.pill.ok{color:var(--green);border-color:#2d5a36}
+  .pill.bad{color:var(--red);border-color:#6a2522}.pill.v4{color:var(--teal);border-color:#1f5c54}
+  main{padding:14px 16px;max-width:1300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font:600 11px system-ui;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px;border-bottom:1px solid var(--line)}
+  td{padding:6px;border-bottom:1px solid #262a30;vertical-align:middle}
+  tr.dup td{background:rgba(229,83,75,.06)}
+  input,select{background:#0d0f12;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:13px var(--mono)}
+  input.serial{width:150px} input.name{width:170px} input.gain{width:64px} input.notes{width:100%;min-width:160px}
+  input:focus,select:focus{outline:1px solid var(--amber)}
+  .btn{background:#2a2f36;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font:600 12px system-ui;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:#4a515a}
+  .btn.primary{background:var(--amber);color:#1b1305;border-color:var(--amber)}
+  .btn.teal{background:var(--teal);color:#062520;border-color:var(--teal)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .mono{font-family:var(--mono)} .dim{color:var(--dim)} .small{font-size:12px}
+  .banner{padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:13px}
+  .banner.info{background:#16302c;border:1px solid #1f5c54}
+  .banner.warn{background:#33270f;border:1px solid #6a4a1c}
+  .banner.err{background:#3a1715;border:1px solid #6a2522}
+  .banner.ok{background:#17301c;border:1px solid #2d5a36}
+  #wizard .step{font-size:16px;margin:4px 0 10px}
+  #wizard select{width:auto;min-width:120px}
+  #wizard .grid{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;max-width:620px}
+  .counter{font:600 12px var(--mono);color:var(--dim)}
+  .chk{display:inline-flex;gap:6px;align-items:center}
+  #toast{position:fixed;right:16px;bottom:16px;max-width:420px;display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">rtlnc <small>dongle serials &amp; names</small></div>
+  <span class="stat">dongles <b id="count">—</b></span>
+  <span id="dupPill" class="pill bad" style="display:none">duplicate serials</span>
+  <span id="demo" class="pill warn" style="display:none">DEMO — pretend dongles</span>
+  <span class="stat small">labels: <b id="cfg">—</b></span>
+</header>
+<main>
+  <div id="events"></div>
+  <div id="dupBanner" class="banner warn" style="display:none">
+    Several dongles report the same serial, so software can't tell which physical
+    dongle is which. Use the <b>numbering wizard</b>: it has you plug them in one at a time.
+  </div>
+
+  <div class="card" id="wizard">
+    <h3>Numbering wizard</h3>
+    <div id="wzBody">
+      <div class="step">Give every dongle its own serial, one at a time.</div>
+      <div class="dim small" style="margin-bottom:10px">About a minute per dongle. Stop the rtlnc core first (it keeps the dongles busy). Have a marker or labels ready.</div>
+      <button class="btn primary" id="wzStart">Start wizard</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Connected dongles</h3>
+    <table>
+      <thead><tr><th>#</th><th>Serial (in dongle)</th><th></th><th>Name</th><th>Role</th><th>Gain dB</th><th>Bias-T</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="dim small" style="margin-top:10px">
+      <b>Serial</b> is written into the dongle's EEPROM (up to 14 characters; a backup is saved first and the write is verified).
+      A new serial appears after you unplug and replug.
+      <b>Name / role / gain / bias-T / notes</b> are saved on this PC and used by <span class="mono">rtlnc run</span>
+      (roles <span class="mono">main, aux1, aux2…</span> pick which dongle is which) and by the control panel.
+      <br>Tip: unplug or plug a dongle and this page tells you which one it was.
+    </div>
+    <div id="demoBar" style="display:none;margin-top:10px">
+      <button class="btn" id="demoPlug">Demo: plug in a new dongle</button>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let D = null, sig = "", prev = null;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function api(path, body){
+  const r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg, kind="info", ms=6000){
+  const d = document.createElement("div"); d.className = "banner " + kind; d.innerHTML = msg;
+  $("toast").append(d); setTimeout(() => d.remove(), ms);
+}
+function event(msg, kind="info"){
+  const d = document.createElement("div"); d.className = "banner " + kind; d.innerHTML = msg;
+  $("events").prepend(d); setTimeout(() => d.remove(), 15000);
+  while ($("events").children.length > 3) $("events").lastChild.remove();
+}
+const who = d => `<span class="mono">${esc(d.serial)}</span>${d.label.name ? " (" + esc(d.label.name) + ")" : ""}`;
+
+// ------------------------------------------------------------ table
+function render(){
+  const tb = $("rows"); tb.innerHTML = "";
+  for (const d of D.devices){
+    const l = d.label, tr = document.createElement("tr");
+    if (d.duplicate) tr.className = "dup";
+    tr.innerHTML = `
+      <td class="mono">${d.index}</td>
+      <td><input class="serial" maxlength="14" value="${esc(d.serial)}" title="printable ASCII, max 14">
+          <button class="btn wr" title="Write this serial into the dongle's EEPROM">Write</button></td>
+      <td>${d.is_v4 ? '<span class="pill v4">V4</span>' : `<span class="pill bad" title="rtlnc only works with RTL-SDR Blog V4 dongles">not V4 · unsupported</span>`}
+          ${d.duplicate ? '<span class="pill bad">dup</span>' : d.factory ? '<span class="pill warn">factory</span>' : ""}</td>
+      <td><input class="name" value="${esc(l.name)}" placeholder="e.g. Solar inverter"></td>
+      <td><select class="role">${D.roles.map(r => `<option ${r === (l.role || "unused") ? "selected" : ""}>${r}</option>`).join("")}</select></td>
+      <td><input class="gain" type="number" step="0.1" min="0" max="50" value="${l.gain ?? ""}" placeholder="30"></td>
+      <td><label class="chk"><input class="bt" type="checkbox" ${l.bias_tee ? "checked" : ""}></label></td>
+      <td><input class="notes" value="${esc(l.notes)}" placeholder="antenna, location…"></td>
+      <td><button class="btn teal sv">Save</button>
+          ${D.demo ? `<button class="btn rp">replug</button> <button class="btn up">unplug</button>` : ""}</td>`;
+    const q = s => tr.querySelector(s);
+    q(".wr").onclick = async () => {
+      const s = q(".serial").value.trim();
+      if (s === d.serial){ toast("That is already its serial.", "warn"); return; }
+      const extra = d.duplicate ? `\n\nWARNING: ${D.devices.filter(x => x.serial === d.serial).length} dongles share "${d.serial}". ` +
+        `Index ${d.index} is one of them, but you can't know which physical dongle. Better: use the wizard.` : "";
+      if (!confirm(`Write serial "${s}" into dongle #${d.index} (now "${d.serial}")?${extra}`)) return;
+      try {
+        const r = await api("/api/serial", {index:d.index, serial:s});
+        toast(`Written &amp; verified: <b class="mono">${esc(s)}</b>. Unplug and replug the dongle to see it.` +
+              (r.warning ? `<br>⚠ ${esc(r.warning)}` : "") + `<br><span class="small dim">backup: ${esc(r.backup)}</span>`, "ok", 10000);
+      } catch (e){ toast("Write failed: " + esc(e.message), "err", 10000); }
+    };
+    q(".sv").onclick = async () => {
+      try {
+        await api("/api/label", {serial:d.serial, name:q(".name").value.trim(), role:q(".role").value,
+          gain:q(".gain").value, bias_tee:q(".bt").checked, notes:q(".notes").value.trim()});
+        toast(`Saved label for <span class="mono">${esc(d.serial)}</span>.`, "ok", 3000); sig = ""; poll();
+      } catch (e){ toast("Save failed: " + esc(e.message), "err"); }
+    };
+    if (D.demo){
+      q(".rp").onclick = () => api("/api/demo/replug", {index:d.index}).then(poll);
+      q(".up").onclick = () => api("/api/demo/unplug", {index:d.index}).then(poll);
+    }
+    tb.append(tr);
+  }
+  if (!D.devices.length) tb.innerHTML = `<tr><td colspan="9" class="dim">No RTL-SDR dongles found. Plug one in (and stop rtlnc if it is running).</td></tr>`;
+}
+
+// ------------------------------------------------------------ plug / unplug detection
+function diffEvents(old, cur){
+  if (!old) return;
+  const key = d => d.serial, cnt = arr => arr.reduce((m,d) => (m[key(d)] = (m[key(d)]||0)+1, m), {});
+  const a = cnt(old), b = cnt(cur);
+  for (const s of new Set([...Object.keys(a), ...Object.keys(b)])){
+    const diff = (b[s]||0) - (a[s]||0);
+    const d = cur.find(x => x.serial === s) || old.find(x => x.serial === s);
+    if (diff > 0) event(`🔌 Just plugged in: ${who(d)}`, "info");
+    if (diff < 0) event(`⏏ Just unplugged: ${who(d)}`, "warn");
+  }
+}
+
+async function poll(){
+  try {
+    const j = await api("/api/devices");
+    diffEvents(D && D.devices, j.devices);
+    D = j;
+    $("count").textContent = j.devices.length;
+    $("cfg").textContent = j.config;
+    $("demo").style.display = j.demo ? "" : "none";
+    $("demoBar").style.display = j.demo ? "" : "none";
+    const dup = j.devices.some(d => d.duplicate);
+    $("dupPill").style.display = dup ? "" : "none";
+    $("dupBanner").style.display = dup ? "" : "none";
+    const s = JSON.stringify(j.devices);
+    const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#rows");
+    if (s !== sig && !editing){ sig = s; render(); }
+    wizardTick();
+  } catch (e){ $("count").textContent = "?"; }
+}
+setInterval(poll, 1000); poll();
+$("demoPlug").onclick = () => api("/api/demo/plug", {}).then(poll);
+
+// ------------------------------------------------------------ wizard
+const W = {on:false, step:null, done:[], target:null};
+$("wzStart").onclick = () => { W.on = true; W.done = []; W.step = null; wizardTick(true); };
+const unnumbered = () => D.devices.filter(d => d.factory || d.duplicate);
+
+function wz(html){ $("wzBody").innerHTML = html; }
+function wizardTick(force){
+  if (!W.on || !D) return;
+  const un = unnumbered();
+  let next = W.step;
+  if (W.step === null) next = un.length === 1 ? "form" : un.length === 0 ? "plug" : "unplugAll";
+  // once a single un-numbered dongle is left it's unambiguous: go straight to naming it
+  if (W.step === "unplugAll" && un.length <= 1) next = un.length ? "form" : "plug";
+  if (W.step === "plug" && un.length === 1) next = "form";
+  if (W.step === "plug" && un.length > 1) next = "unplugAll";
+  if (W.step === "replug" && D.devices.some(d => d.serial === W.target)) next = "plug";
+  if (next === W.step && !force) return;
+  W.step = next;
+  const doneList = W.done.length ? `<div class="small dim" style="margin-top:10px">Done this session: ${W.done.map(s => `<span class="mono">${esc(s)}</span>`).join(", ")}</div>` : "";
+  const stop = `<button class="btn" id="wzStop">Finish</button>`;
+  if (next === "unplugAll"){
+    wz(`<div class="counter">STEP 1</div><div class="step">Unplug the un-numbered dongles until only <b>one</b> is left.</div>
+        <div class="dim">Dongles you already numbered can stay plugged in. Un-numbered still connected: <b>${un.length}</b></div>
+        <div style="margin-top:10px">${stop}</div>${doneList}`);
+  } else if (next === "plug"){
+    wz(`<div class="counter">STEP 2</div><div class="step">Plug in <b>one</b> un-numbered dongle.</div>
+        <div class="dim">Waiting for it to appear…</div><div style="margin-top:10px">${stop}</div>${doneList}`);
+  } else if (next === "form"){
+    const d = un[0], sg = D.suggest;
+    W.index = d.index;
+    wz(`<div class="counter">STEP 3</div><div class="step">Name this dongle (#${d.index}): the only un-numbered one connected.</div>
+      <div class="grid">
+        <span>Serial</span><span><input id="wzSerial" class="serial" maxlength="14" value="${esc(sg.serial)}"> <span class="dim small">written into the dongle</span></span>
+        <span>Name</span><input id="wzName" class="name" value="${esc(sg.name)}">
+        <span>Role</span><select id="wzRole">${D.roles.map(r => `<option ${r === sg.role ? "selected" : ""}>${r}</option>`).join("")}</select>
+        <span>Gain dB</span><input id="wzGain" class="gain" type="number" step="0.1" placeholder="30">
+        <span>Bias-T</span><label class="chk"><input id="wzBt" type="checkbox"> power an active antenna</label>
+        <span>Notes</span><input id="wzNotes" class="notes" placeholder="which antenna / noise source">
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" id="wzWrite">Write serial &amp; save</button>${stop}</div>${doneList}`);
+    $("wzWrite").onclick = async () => {
+      const serial = $("wzSerial").value.trim();
+      try {
+        await api("/api/serial", {index:W.index, serial,
+          label:{name:$("wzName").value.trim(), role:$("wzRole").value,
+                 gain:$("wzGain").value === "" ? null : +$("wzGain").value,
+                 bias_tee:$("wzBt").checked, notes:$("wzNotes").value.trim()}});
+        W.done.push(serial); W.target = serial; W.step = "replug"; wizardTick(true);
+      } catch (e){ toast("Write failed: " + esc(e.message), "err", 10000); }
+    };
+  } else if (next === "replug"){
+    wz(`<div class="counter">STEP 4</div><div class="step">✔ Written. Label the dongle <b class="mono">${esc(W.target)}</b>, then unplug it and plug it back in.</div>
+        <div class="dim">Waiting to see it come back with its new serial… then plug in the next one.</div>
+        <div style="margin-top:10px;display:flex;gap:8px"><button class="btn" id="wzSkip">Skip</button>${stop}</div>${doneList}`);
+    $("wzSkip").onclick = () => { W.step = "plug"; wizardTick(true); };
+  }
+  const st = $("wzStop");
+  if (st) st.onclick = () => { W.on = false;
+    wz(`<div class="step">Wizard finished.</div>${doneList}<div style="margin-top:10px"><button class="btn primary" id="wzStart2">Start again</button></div>`);
+    $("wzStart2").onclick = () => { W.on = true; W.done = []; W.step = null; wizardTick(true); }; };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+rtlnc bundles the following third-party components:
+
+* RTL-SDR Blog driver library (rtlsdr.dll), GPL-2.0-or-later
+  Source: https://github.com/rtlsdrblog/rtl-sdr-blog
+* libusb-1.0, LGPL-2.1-or-later. Source: https://github.com/libusb/libusb
+* Python runtime (PSF License), NumPy and SciPy (BSD), pyrtlsdr (GPL-3.0),
+  pyserial (BSD), python-sounddevice (MIT) with PortAudio (MIT).
+
+rtlnc itself is licensed GPL-3.0-or-later (see LICENSE), which is compatible
+with the bundled components. Full license texts are available at the source
+links above.

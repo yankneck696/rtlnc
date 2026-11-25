@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.buildenv/
+build/
+dist/
+packaging/vendor/
+*.cf32
+*.wav
+.DS_Store
