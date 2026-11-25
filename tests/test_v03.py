@@ -108,3 +108,30 @@ def test_launcher_demo_start_stop(tmp_path, monkeypatch):
     post("/api/stop", {})
     assert not json.loads(urllib.request.urlopen(B + "/api/state").read())["running"]
     srv.shutdown()
+
+
+def test_launcher_preflight_and_watchdog(tmp_path, monkeypatch):
+    """No dongles -> clear message, nothing started; core dies -> all parts stop."""
+    monkeypatch.setenv("RTLNC_CONFIG_DIR", str(tmp_path))
+    import rtlnc.launcher as Lm
+    import rtlnc.eeprom as E
+
+    class NoDongles:
+        def list(self):
+            return []
+    monkeypatch.setattr(E, "RtlIO", NoDongles)
+    L = Lm.Launcher()
+    L.s.update(local_audio=False, bus_port=7431, panel_port=8441)
+    with pytest.raises(Lm.LauncherError, match="Demo mode"):
+        L.start()
+    assert not L.procs
+    L.s["demo"] = True
+    L.start()
+    time.sleep(3)
+    assert L.procs["core"].alive() and L.procs["panel"].alive()
+    L.procs["core"].p.kill()
+    for _ in range(20):
+        time.sleep(0.25)
+        if not L.procs:
+            break
+    assert not L.procs and "canceller core ended" in L.logs[-1]

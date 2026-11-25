@@ -36,8 +36,15 @@ or in digital-mode software, and it can follow your rig's frequency by CAT.
 
 ## 1. Windows: install and use (no command lines)
 
-1. **Install.** Run `rtlnc-setup-0.3.0.exe`; Windows may show "unknown publisher"
-   (More info → Run anyway). The RTL-SDR Blog V4 driver library is included.
+1. **Install.** Download `rtlnc-setup-<version>.exe` from
+   [Releases](https://github.com/yankneck696/rtlnc/releases/latest) and run it.
+   The RTL-SDR Blog V4 driver library is included. The program isn't
+   code-signed, so expect two warnings the first time:
+   * **Browser**: the download may look like it did nothing. Press
+     **Ctrl + J**, find the file, then **⋯ → Keep** (Edge; then *Show more →
+     Keep anyway*) or **Download suspicious file / Keep** (Chrome).
+   * **Windows**: the blue *"Windows protected your PC"* box. Click
+     **More info → Run anyway**.
 2. **USB driver, once per dongle.** Plug in a V4, run
    [Zadig](https://zadig.akeo.ie): *Options → List All Devices* →
    "Bulk-In, Interface (Interface 0)" → **WinUSB** → *Install Driver*. Repeat
@@ -61,8 +68,8 @@ Settings, names and logs live in `%APPDATA%\rtlnc\`.
 
 ### Getting the installer
 * **Releases**: the [Releases page](https://github.com/yankneck696/rtlnc/releases)
-  has `rtlnc-setup-<version>.exe` for every tagged version. GitHub Actions
-  builds it automatically when a tag like `v0.3.0` is pushed.
+  has `rtlnc-setup-<version>.exe` for every version. GitHub Actions builds
+  and publishes it automatically when the version in `pyproject.toml` changes.
 * **Latest build**: every push to `main` is built and tested; open the latest
   run under [Actions](https://github.com/yankneck696/rtlnc/actions) and
   download *rtlnc-windows* from *Artifacts* (needs a GitHub login).
@@ -71,7 +78,7 @@ Settings, names and logs live in `%APPDATA%\rtlnc\`.
 * **Your PC**: install Python 3.12 (64-bit, python.org) and optionally
   [Inno Setup 6](https://jrsoftware.org/isinfo.php), then double-click
   `packaging\build.bat`. You get `dist\rtlnc\rtlnc.exe` and, with Inno
-  Setup, `dist\installer\rtlnc-setup-0.3.0.exe`.
+  Setup, `dist\installer\rtlnc-setup-<version>.exe`.
 
 The build downloads the official RTL-SDR Blog driver release (V1.3.2,
 x64 `rtlsdr.dll` + libusb) and bundles it; see `packaging/THIRD-PARTY.txt`.
@@ -347,7 +354,8 @@ signal. No calibration source is needed.
 `y[n] = main[n−D] − Σ_k Σ_j w[k,j]·aux_k[n−j]`, with K taps per aux channel
 (default 5). All aux channels are solved jointly with exponentially weighted
 least squares, so N aux channels give N independent nulls. Training leaves
-out ±4 kHz around the listen frequency (`--exclude`). The canceller learns
+out a band around the listen frequency that suits the mode (about ±4 kHz
+for SSB, ±10 kHz for FM; `--exclude`). The canceller learns
 the noise coupling from the rest of the 240 kHz span, so a strong station
 that also leaks into the aux antennas isn't cancelled along with the noise.
 In simulation this protection is worth about 18 dB in the strong-station
@@ -390,6 +398,10 @@ None of this has been measured on real dongles yet.
 
 ## 9. Troubleshooting
 
+* **The installer "does nothing" when you click download**: your browser
+  blocked it; see section 1, step 1 (Ctrl + J → Keep).
+* **Start says dongles have no roles**: open *Dongles & serials…* and run
+  the numbering wizard, or tick *Demo mode* to try without hardware.
 * **"No RTL-SDR found"** (Windows): install WinUSB with Zadig (section 1).
   Windows Update sometimes puts the TV driver back; re-run Zadig.
 * **"not V4 / unsupported"**: rtlnc only works with RTL-SDR Blog V4 dongles.

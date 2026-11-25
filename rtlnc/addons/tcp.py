@@ -101,8 +101,12 @@ class RtlTcpServer:
         self.clients: list[TcpClient] = []
         self.pending_tune: tuple[float, float] | None = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((host, port))
+        from ..netutil import exclusive, port_in_use_message
+        exclusive(self.sock)
+        try:
+            self.sock.bind((host, port))
+        except OSError as e:
+            raise SystemExit(port_in_use_message("the rtl_tcp server", port)) from e
         self.sock.listen(4)
         self.addr = self.sock.getsockname()
         threading.Thread(target=self._accept, daemon=True).start()

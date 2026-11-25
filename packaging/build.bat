@@ -18,10 +18,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File packaging\fetch_dlls.ps1 || 
 echo === Building rtlnc.exe
 pyinstaller --noconfirm --clean packaging\rtlnc.spec || goto :err
 
+for /f "usebackq delims=" %%v in (`python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"`) do set VER=%%v
+echo rtlnc version %VER%
+
 set ISCC="%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
 if exist %ISCC% (
   echo === Building installer
-  %ISCC% packaging\rtlnc.iss || goto :err
+  %ISCC% /DAppVersion=%VER% packaging\rtlnc.iss || goto :err
   echo.
   echo Done: installer in dist\installer\, app folder in dist\rtlnc\
 ) else (

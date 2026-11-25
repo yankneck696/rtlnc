@@ -130,8 +130,12 @@ class BusServer:
         self.peers: list[_Peer] = []
         self._log: queue.Queue = queue.Queue()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((host, port))
+        from .netutil import exclusive, port_in_use_message
+        exclusive(self.sock)
+        try:
+            self.sock.bind((host, port))
+        except OSError as e:
+            raise SystemExit(port_in_use_message("the rtlnc core", port)) from e
         self.sock.listen(8)
         self.addr = self.sock.getsockname()
         self.seq = 0

@@ -24,11 +24,12 @@ import threading
 import time
 import webbrowser
 from collections import deque
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 from . import devconfig
 from .bus import BusClient
+from .netutil import HTTPServer
 
 DEFAULTS = {
     "freq_mhz": 7.160, "mode": "lsb", "squelch": None, "demo": False,
@@ -41,6 +42,10 @@ DEFAULTS = {
     "bus_port": 7355, "panel_port": 8073, "devices_port": 8074,
 }
 CREATE_NO_WINDOW = 0x08000000
+
+
+class LauncherError(Exception):
+    """A problem to show the user instead of starting."""
 
 
 def settings_path():
@@ -142,6 +147,8 @@ class Launcher:
                     code = p.p.returncode
                     if code not in (0, None) and not getattr(p, "stopping", False):
                         self.log(f"{name} stopped unexpectedly (exit {code}); see its messages above")
+                    if name == "core" and not getattr(p, "stopping", False):
+                        threading.Thread(target=self._core_died, daemon=True).start()
             time.sleep(0.3)
 
     def running(self) -> bool:
@@ -157,10 +164,38 @@ class Launcher:
                 self.status = {}
 
     # ------------------------------------------------------------ start / stop
+    def preflight(self) -> None:
+        """Catch the common set-up problems before anything starts."""
+        if self.s["demo"]:
+            return
+        roles = devconfig.from_roles()
+        try:
+            from .eeprom import RtlIO
+            present = RtlIO().list()
+        except Exception as e:
+            raise LauncherError(f"Can't access RTL-SDR dongles: {e}")
+        if not present:
+            raise LauncherError("No RTL-SDR dongles found. Plug them in (powered hub). On a new PC, "
+                                "install the WinUSB driver for each one with Zadig first. "
+                                "To try without hardware, tick Demo mode.")
+        if len(roles) < 2:
+            raise LauncherError("Your dongles don't have roles yet. Click 'Dongles & serials…', "
+                                "give one dongle the role 'main' and at least one 'aux1' "
+                                "(the wizard does this for you). To try without hardware, tick Demo mode.")
+        serials = [d.serial for d in present]
+        cfg = devconfig.load()["devices"]
+        for s in roles:
+            if s not in serials:
+                role = cfg.get(s, {}).get("role", "?")
+                name = cfg.get(s, {}).get("name") or s
+                raise LauncherError(f"The {role} dongle '{name}' ({s}) isn't plugged in.")
+
     def start(self) -> None:
         with self.lock:
             if self.running():
                 return
+            self.preflight()
+            self._kill_all()                 # leftovers from a failed start
             self.stop_devices()
             s = self.s
             bus = f"127.0.0.1:{s['bus_port']}"
@@ -209,8 +244,29 @@ class Launcher:
             threading.Thread(target=self._status_loop, args=(self.bus,), daemon=True).start()
             self.log("started: " + ", ".join(self.procs))
 
+    def _kill_all(self) -> None:
+        for name, p in list(self.procs.items()):
+            if name == "devices":
+                continue
+            p.stopping = True
+            if p.alive():
+                p.p.terminate()
+                p.stop(2)
+            self.procs.pop(name, None)
+        if self.bus:
+            b, self.bus = self.bus, None
+            b.close()
+
+    def _core_died(self) -> None:
+        with self.lock:
+            self._kill_all()
+            self.status = {}
+        self.log("Stopped: the canceller core ended. Fix the problem shown above, then press Start.")
+
     def stop(self) -> None:
         with self.lock:
+            for p in self.procs.values():   # mark first: a clean exit is not a crash
+                p.stopping = True
             if self.bus and self.bus.sock:
                 self.bus.send({"cmd": "quit"})      # let the core release the dongles cleanly
             for name in ["rig", "sound", "tcp", "panel", "core"]:
@@ -348,7 +404,12 @@ def make_handler(L: Launcher, page: bytes):
                             L.bus.send({"cmd": "demod", "mode": body["mode"]})
                     self._json({"ok": True})
                 elif p == "/api/start":
-                    L.start(); self._json({"ok": True})
+                    try:
+                        L.start()
+                    except LauncherError as e:
+                        L.log(str(e))
+                        return self._json({"error": str(e)}, 400)
+                    self._json({"ok": True})
                 elif p == "/api/stop":
                     L.stop(); self._json({"ok": True})
                 elif p == "/api/open":
@@ -393,7 +454,7 @@ def main(argv=None) -> None:
     a, _ = ap.parse_known_args(argv if argv is not None else sys.argv[1:])
     L = Launcher()
     page = (Path(__file__).parent / "launcher.html").read_bytes()
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(L, page))
+    srv = HTTPServer(("127.0.0.1", a.port), make_handler(L, page))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
     try:

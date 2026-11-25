@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1
+- Launcher: pressing Start without dongles set up now explains what to do
+  (plug in / Zadig / set roles / Demo mode) instead of failing in the log.
+- Launcher: if the core stops, the panel and other parts stop with it, and
+  a second Start no longer leaves a duplicate panel running.
+- Windows: a port that is already in use can't be shared by a second copy;
+  you get a clear message instead.
+- GitHub build now rehearses the launcher (Demo-mode Start/Stop) on Windows
+  and publishes a Release automatically when the version changes.
+- README: how to get past browser/SmartScreen download warnings.
+
 ## 0.3.0
 - **RTL-SDR Blog V4 only**; other dongles are refused.
 - **0.5–450 MHz**: HF, 6 m, 2 m and 70 cm. A fast per-channel phase lock

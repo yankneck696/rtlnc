@@ -19,9 +19,10 @@ from __future__ import annotations
 import argparse
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
+from ..netutil import HTTPServer, port_in_use_message
 from ..bus import DEFAULT_PORT, BusClient, parse_addr
 
 ALLOWED = {"chan", "mode", "lam", "exclude", "listen", "tune", "reacquire",
@@ -122,7 +123,10 @@ def main(argv=None):
     st = State()
     threading.Thread(target=_bus_loop, args=(bus, st), daemon=True).start()
     host, port = parse_addr(a.http)
-    srv = ThreadingHTTPServer((host, port), make_handler(bus, st, page, a.token))
+    try:
+        srv = HTTPServer((host, port), make_handler(bus, st, page, a.token))
+    except OSError as e:
+        raise SystemExit(port_in_use_message("the control panel", port)) from e
     url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{srv.server_address[1]}/"
     if a.token:
         url += f"?t={a.token}"

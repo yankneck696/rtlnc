@@ -1,5 +1,7 @@
 ; Inno Setup 6 script: builds dist\installer\rtlnc-setup-<version>.exe
-#define AppVersion "0.3.0"
+#ifndef AppVersion
+  #define AppVersion "0.0.0-dev"
+#endif
 
 [Setup]
 AppId={{5C2F3E3A-8E7B-4C1D-9A51-0D2C6E8B7F41}

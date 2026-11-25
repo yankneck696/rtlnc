@@ -28,10 +28,11 @@ import argparse
 import json
 import sys
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 from .. import devconfig, eeprom
+from ..netutil import HTTPServer, port_in_use_message
 from ..bus import parse_addr
 
 
@@ -224,7 +225,10 @@ def main(argv=None):
         elif a.cmd == "web":
             page = (Path(__file__).parent / "devices.html").read_bytes()
             host, port = parse_addr(a.http)
-            srv = ThreadingHTTPServer((host, port), make_handler(io, page, a.demo))
+            try:
+                srv = HTTPServer((host, port), make_handler(io, page, a.demo))
+            except OSError as e:
+                raise SystemExit(port_in_use_message("the dongle editor", port)) from e
             print(f"[rtlnc-devices] open http://{host}:{srv.server_address[1]}/"
                   + ("   (demo: pretend dongles)" if a.demo else ""))
             try:

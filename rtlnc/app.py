@@ -154,8 +154,9 @@ class Core:
             cfg = devconfig.load()
             devs = [devconfig.resolve(d, cfg) for d in a.devices] or devconfig.from_roles(cfg)
             if len(devs) < 2:
-                sys.exit("need at least 2 devices: main + one aux. Give --devices, or set roles "
-                         "with `rtlnc-devices web` (or use --sim N to try without hardware)")
+                sys.exit("No dongles assigned: rtlnc needs a 'main' dongle and at least one "
+                         "'aux1'. Set the roles in 'Dongles & serials...' (rtlnc-devices web), "
+                         "or give --devices. To try without hardware use Demo mode (--sim 2).")
             labels = [cfg["devices"].get(d, {}) for d in devs]
             gains = a.gain or [float(l.get("gain", 30.0)) for l in labels]
             if a.bias_tee is not None:
