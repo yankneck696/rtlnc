@@ -10,7 +10,8 @@ Run this while the rtlnc core is NOT running (it needs the dongles free).
     rtlnc-devices backup 0                save its EEPROM image
     rtlnc-devices restore 0 FILE          write a saved image back
 
-Serial (stored in the dongle): up to 14 printable ASCII characters on a V4.
+Serial (stored in the dongle): up to 14 printable ASCII characters on a V4,
+13 on a V4L (its longer product name takes the space).
 That is enough for a readable tag like RTLNC-AUX1 or AUX1-INVERTER. It goes
 wherever the dongle goes. A new serial shows up after you unplug and replug.
 
@@ -32,6 +33,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 from .. import devconfig, eeprom
+from ..eeprom import model_of
 from ..netutil import HTTPServer, port_in_use_message
 from ..bus import parse_addr
 
@@ -47,7 +49,8 @@ def _rows(io) -> list[dict]:
         rows.append({"index": d.index, "manufacturer": d.manufacturer, "product": d.product,
                      "serial": d.serial, "duplicate": counts[d.serial] > 1,
                      "factory": d.serial in eeprom.DEFAULT_SERIALS,
-                     "is_v4": d.manufacturer == "RTLSDRBlog" and d.product == "Blog V4",
+                     "is_v4": model_of(d.manufacturer, d.product) is not None,
+                     "model": model_of(d.manufacturer, d.product) or d.product,
                      "label": cfg["devices"].get(d.serial, {})})
     return rows
 
@@ -134,7 +137,7 @@ def make_handler(io, page: bytes, demo: bool):
                 elif p == "/api/info":
                     info = eeprom.parse(io.read(int(body["index"])))
                     self._json(200, {**info.__dict__, "max_serial_len": info.max_serial_len(),
-                                     "is_v4": info.is_v4})
+                                     "is_v4": info.is_v4, "model": info.model})
                 elif p.startswith("/api/demo/") and demo:
                     act = p.rsplit("/", 1)[1]
                     i = int(body.get("index", 0))
@@ -198,7 +201,7 @@ def main(argv=None):
             info = eeprom.parse(io.read(a.index))
             for k, v in info.__dict__.items():
                 print(f"{k:14s} {v if not isinstance(v, int) or isinstance(v, bool) else hex(v)}")
-            print(f"{'max serial':14s} {info.max_serial_len()} chars   V4: {info.is_v4}")
+            print(f"{'max serial':14s} {info.max_serial_len()} chars   model: {info.model or 'unsupported'}")
         elif a.cmd == "backup":
             data = io.read(a.index)
             info = eeprom.parse(data)

@@ -312,8 +312,10 @@ class Launcher:
         try:
             from .eeprom import RtlIO
             cfg = devconfig.load()
+            from .eeprom import model_of
             return [{"index": d.index, "serial": d.serial,
-                     "v4": (d.manufacturer, d.product) == ("RTLSDRBlog", "Blog V4"),
+                     "v4": model_of(d.manufacturer, d.product) is not None,
+                     "model": model_of(d.manufacturer, d.product) or d.product,
                      "name": cfg["devices"].get(d.serial, {}).get("name", ""),
                      "role": cfg["devices"].get(d.serial, {}).get("role", "")}
                     for d in RtlIO().list()]

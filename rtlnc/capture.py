@@ -1,7 +1,7 @@
 """Multi-dongle capture with pyrtlsdr async readers (one thread per dongle).
 
-RTL-SDR Blog V4 only: every dongle is checked by its USB strings
-("RTLSDRBlog" / "Blog V4") before it is opened. Coverage is 0.5-450 MHz,
+RTL-SDR Blog V4 and V4L (Lite) only: every dongle is checked by its USB
+strings ("RTLSDRBlog" / "Blog V4" or "Blog V4L") before it is opened. Coverage is 0.5-450 MHz,
 HF through 70 cm: below 28.8 MHz through the V4's upconverter, above it
 directly.
 
@@ -20,7 +20,6 @@ import numpy as np
 
 FREQ_MIN = 0.5e6
 FREQ_MAX = 450e6
-V4_STRINGS = ("RTLSDRBlog", "Blog V4")
 
 
 def freq_ok(f: float) -> bool:
@@ -28,8 +27,8 @@ def freq_ok(f: float) -> bool:
 
 
 def check_v4(specs: list[str]) -> None:
-    """Refuse anything that isn't an RTL-SDR Blog V4."""
-    from .eeprom import RtlIO
+    """Refuse anything that isn't an RTL-SDR Blog V4 or V4L."""
+    from .eeprom import RtlIO, model_of
     devs = RtlIO().list()
     if not devs:
         raise RuntimeError("no RTL-SDR found. On Windows, install the WinUSB driver "
@@ -46,9 +45,9 @@ def check_v4(specs: list[str]) -> None:
             d = m[0] if m else None
         if d is None:
             raise RuntimeError(f"dongle {spec!r} not found (plugged in? see the dongle editor)")
-        if (d.manufacturer, d.product) != V4_STRINGS:
+        if model_of(d.manufacturer, d.product) is None:
             raise RuntimeError(f"dongle {spec!r} is '{d.manufacturer} {d.product}': "
-                               f"only RTL-SDR Blog V4 dongles are supported")
+                               f"only RTL-SDR Blog V4 / V4L dongles are supported")
 
 
 def _open(spec: str):

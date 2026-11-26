@@ -1,7 +1,7 @@
 [project]
 name = "rtlnc"
-version = "0.3.2"
-description = "Multi-dongle RTL-SDR Blog V4 phasing noise canceller, 0.5-450 MHz (HF to 70 cm), independent clocks"
+version = "0.3.3"
+description = "Multi-dongle RTL-SDR Blog V4 / V4L phasing noise canceller, 0.5-450 MHz (HF to 70 cm), independent clocks"
 requires-python = ">=3.9"
 license = {text = "GPL-3.0-or-later"}
 readme = "README.md"

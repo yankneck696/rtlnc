@@ -1,7 +1,8 @@
-# Downloads the official RTL-SDR Blog driver release (V4 support) and copies the
+# Downloads the official RTL-SDR Blog driver release (V4 + V4L support) and copies the
 # 64-bit DLLs into packaging\vendor\rtlsdr so they get bundled into rtlnc.exe.
 $ErrorActionPreference = "Stop"
-$tag  = if ($env:RTLSDR_BLOG_TAG) { $env:RTLSDR_BLOG_TAG } else { "V1.3.2" }
+# V1.4.0 is the first release with V4L (Lite) support; it still supports the V4 and V3.
+$tag  = if ($env:RTLSDR_BLOG_TAG) { $env:RTLSDR_BLOG_TAG } else { "V1.4.0" }
 $url  = "https://github.com/rtlsdrblog/rtl-sdr-blog/releases/download/$tag/Release.zip"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dest = Join-Path $here "vendor\rtlsdr"

@@ -129,3 +129,31 @@ def test_core_uses_roles(tmp_config, monkeypatch):
     assert seen == {"devs": ["S-MAIN", "S-AUX1"], "gains": [33.0, 21.0], "bt": [False, True]}
     assert core.names == ["Main", "Inverter"]
     core.bus.close()
+
+
+def test_v4l_supported_and_serial_length():
+    """RTL-SDR Blog V4L (Lite): product 'Blog V4L', one character less room for the serial."""
+    img = eeprom.make_image(product="Blog V4L")
+    info = eeprom.parse(img)
+    assert info.model == "V4L" and info.is_v4 and info.max_serial_len() == 13
+    new = eeprom.parse(eeprom.with_serial(img, "RTLNC-AUX1"))
+    assert (new.serial, new.product) == ("RTLNC-AUX1", "Blog V4L")       # product kept
+    with pytest.raises(eeprom.EepromError, match="allows 13"):
+        eeprom.with_serial(img, "X" * 14)
+    assert eeprom.model_of("RTLSDRBlog", "Blog V4") == "V4"
+    assert eeprom.model_of("Realtek", "RTL2838UHIDIR") is None            # generic dongle
+
+
+def test_capture_accepts_v4_and_v4l_refuses_others(monkeypatch):
+    import rtlnc.eeprom as E
+    from rtlnc import capture
+
+    class IO:
+        def list(self):
+            return [E.DongleInfo(0, "RTLSDRBlog", "Blog V4L", "MAIN"),
+                    E.DongleInfo(1, "RTLSDRBlog", "Blog V4", "AUX1"),
+                    E.DongleInfo(2, "Realtek", "RTL2838UHIDIR", "GENERIC")]
+    monkeypatch.setattr(E, "RtlIO", IO)
+    capture.check_v4(["MAIN", "AUX1"])                                   # V4L + V4: fine
+    with pytest.raises(RuntimeError, match="V4 / V4L"):
+        capture.check_v4(["MAIN", "GENERIC"])

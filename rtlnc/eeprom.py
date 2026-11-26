@@ -12,8 +12,9 @@ The layout follows osmocom rtl_eeprom.c:
 Guards:
   * A backup of the full 256-byte image is saved before every write.
   * Only the serial is changed. Manufacturer and product are kept as they
-    are, because the RTL-SDR Blog V4 driver recognises the dongle by
-    "RTLSDRBlog" / "Blog V4" and switches on its HF upconverter only then.
+    are, because the RTL-SDR Blog driver recognises the dongle by them
+    ("RTLSDRBlog" / "Blog V4", or "Blog V4L" for the V4 Lite) and only then
+    sets up its HF upconverter and tuner inputs.
   * The image is read back and compared after writing.
 """
 from __future__ import annotations
@@ -29,6 +30,17 @@ EEPROM_SIZE = 256
 STR_OFFSET = 0x09
 STR_LIMIT = 78                    # same limit rtl_eeprom enforces
 DEFAULT_SERIALS = {"00000001", "00000000", ""}
+
+# Supported dongles, by their USB manufacturer / product strings.
+SUPPORTED_MODELS = {
+    ("RTLSDRBlog", "Blog V4"): "V4",
+    ("RTLSDRBlog", "Blog V4L"): "V4L",     # V4 Lite: R828S tuner, needs driver >= V1.4.0
+}
+
+
+def model_of(manufacturer: str, product: str) -> str | None:
+    """'V4', 'V4L', or None for anything rtlnc doesn't support."""
+    return SUPPORTED_MODELS.get((manufacturer, product))
 
 
 class EepromError(Exception):
@@ -46,8 +58,13 @@ class EepromInfo:
     strings_end: int
 
     @property
+    def model(self) -> str | None:
+        return model_of(self.manufacturer, self.product)
+
+    @property
     def is_v4(self) -> bool:
-        return self.manufacturer == "RTLSDRBlog" and self.product == "Blog V4"
+        """True for every supported model (V4 and V4L)."""
+        return self.model is not None
 
     def max_serial_len(self) -> int:
         used = STR_OFFSET + (2 + 2 * len(self.manufacturer)) + (2 + 2 * len(self.product))
@@ -207,12 +224,14 @@ class FakeIO:
     """In-memory dongles, for --demo and the tests. Like real hardware, the USB
     serial seen by list() only changes after a 'replug'."""
 
-    def __init__(self, serials=("00000001", "00000001", "00000001")):
-        self.images = [make_image(serial=s) for s in serials]
+    def __init__(self, serials=("00000001", "00000001", "00000001"), product="Blog V4L"):
+        self.product = product
+        self.images = [make_image(product=product, serial=s) for s in serials]
         self.usb = list(serials)
 
     def list(self):
-        return [DongleInfo(i, "RTLSDRBlog", "Blog V4", s) for i, s in enumerate(self.usb)]
+        return [DongleInfo(i, "RTLSDRBlog", parse(img).product, s)
+                for i, (img, s) in enumerate(zip(self.images, self.usb))]
 
     def read(self, i):
         return self.images[i]
@@ -227,7 +246,7 @@ class FakeIO:
         del self.images[i]; del self.usb[i]
 
     def plug(self, serial="00000001"):
-        self.images.append(make_image(serial=serial)); self.usb.append(serial)
+        self.images.append(make_image(product=self.product, serial=serial)); self.usb.append(serial)
 
 
 # ---------------------------------------------------------------------------

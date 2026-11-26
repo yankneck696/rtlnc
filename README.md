@@ -1,4 +1,4 @@
-# rtlnc: multi-dongle phasing noise canceller for RTL-SDR Blog V4 (HF to 70 cm)
+# rtlnc: multi-dongle phasing noise canceller for RTL-SDR Blog V4 / V4L (HF to 70 cm)
 
 [![windows-build](https://github.com/yankneck696/rtlnc/actions/workflows/windows.yml/badge.svg)](https://github.com/yankneck696/rtlnc/actions/workflows/windows.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
@@ -17,8 +17,8 @@ close-in antenna aimed at one noise source, and the canceller nulls up to N
 sources at once. You listen in the app itself, in your favourite SDR program,
 or in digital-mode software, and it can follow your rig's frequency by CAT.
 
-* **RTL-SDR Blog V4 only.** Unmodified, no shared clock: each runs on its own
-  TCXO, and the software measures and tracks the offsets.
+* **RTL-SDR Blog V4 and V4L (Lite) only.** Unmodified, no shared clock: each
+  runs on its own TCXO, and the software measures and tracks the offsets.
 * **0.5 to 450 MHz**: HF (through the V4's upconverter), 6 m, 2 m and 70 cm.
 * **AM, FM, USB, LSB, CW.**
 * **Windows app**: one installer, one window, no command prompts. All the
@@ -38,7 +38,7 @@ or in digital-mode software, and it can follow your rig's frequency by CAT.
 
 1. **Install.** Download `rtlnc-setup-<version>.exe` from
    [Releases](https://github.com/yankneck696/rtlnc/releases/latest) and run it.
-   The RTL-SDR Blog V4 driver library is included. The program isn't
+   The RTL-SDR Blog driver library (V4 + V4L) is included. The program isn't
    code-signed, so expect two warnings the first time:
    * **Browser**: the download may look like it did nothing. Press
      **Ctrl + J**, find the file, then **⋯ → Keep** (Edge; then *Show more →
@@ -80,8 +80,9 @@ Settings, names and logs live in `%APPDATA%\rtlnc\`.
   `packaging\build.bat`. You get `dist\rtlnc\rtlnc.exe` and, with Inno
   Setup, `dist\installer\rtlnc-setup-<version>.exe`.
 
-The build downloads the official RTL-SDR Blog driver release (V1.3.2,
-x64 `rtlsdr.dll` + libusb) and bundles it; see `packaging/THIRD-PARTY.txt`.
+The build downloads the official RTL-SDR Blog driver release (V1.4.0, the
+first with V4L support; x64 `rtlsdr.dll`) and bundles it; see
+`packaging/THIRD-PARTY.txt`.
 
 ---
 
@@ -89,13 +90,24 @@ x64 `rtlsdr.dll` + libusb) and bundles it; see `packaging/THIRD-PARTY.txt`.
 
 | Item | Qty | Notes |
 |---|---|---|
-| **RTL-SDR Blog V4** | N + 1 | Unmodified; only V4s are accepted. One for main, one per noise source. |
+| **RTL-SDR Blog V4 or V4L (Lite)** | N + 1 | Unmodified; only these are accepted. One for main, one per noise source. Preferably all the same model. |
 | Powered USB 2.0/3.0 hub | 1 | Each V4 draws about 250 to 270 mA. Don't run 3 or more from laptop ports. |
 | Main antenna | 1 | Your normal receive antenna for the band. |
 | Aux antennas | N | One per noise source; see below. |
 | Short USB extension leads | N + 1 | Space the dongles apart; they radiate a little. |
 | Optional: band-pass / preselector | N + 1 | Same type on every channel, if used. |
 | Optional: RX protection relay | N + 1 | Needed if you transmit nearby; see Safety. |
+
+### V4 or V4L (Lite)?
+
+Both work, with the same built-in HF upconverter, 1 ppm TCXO and bias-tee.
+The **V4L** uses the R828S tuner and has **less input filtering** than the V4.
+That gives slightly better sensitivity but makes it easier to overload with
+a strong local AM or FM broadcast station. Overload can't be cancelled, so
+near broadcast transmitters fit an AM and/or FM broadcast band-stop filter
+in front of the V4Ls (the main dongle at least). Use the same model for the
+main and aux dongles where you can: mixing them works, but matched
+receivers give slightly deeper nulls.
 
 ### Aux antennas: the "directional" part
 
@@ -159,13 +171,13 @@ rtlnc-devices info 0 | backup 0 | restore 0 FILE
 ```
 Run it while the core is stopped; it needs the dongles to itself.
 * **Serial**: written into the dongle's EEPROM, so it travels with the
-  dongle. Up to 14 printable characters on a V4, enough for `RTLNC-AUX1` or
-  `AUX1-INVERTER`.
+  dongle. Up to 14 printable characters on a V4 and 13 on a V4L, enough for
+  `RTLNC-AUX1` or `AUX1-INVERTER`.
   * Every write first saves the full EEPROM to `eeprom-backups/`, then reads
     the result back to verify it. `restore` puts a backup back.
   * Only the serial is changed. The manufacturer and product strings stay
-    "RTLSDRBlog" / "Blog V4", because the driver uses them to switch on the
-    V4's HF upconverter.
+    "RTLSDRBlog" / "Blog V4" (or "Blog V4L"), because the driver uses them to
+    set up the HF upconverter and tuner inputs.
   * A new serial shows up after you **unplug and replug**.
 * **Numbering wizard**: new dongles all report the same serial, so software
   can't tell them apart. The wizard has you reduce to one un-numbered
@@ -225,8 +237,9 @@ rtlnc check --freq 3.750e6                           # 20 s health check
 rtlnc run   --freq 432.1e6 --mode usb                # main + aux1, aux2… from the saved roles
 rtlnc-panel                                          # control panel: http://127.0.0.1:8073
 ```
-The librtlsdr on your system must support the V4 (the RTL-SDR Blog driver,
-or a current osmocom build).
+The librtlsdr on your system must support your dongles: the RTL-SDR Blog
+driver **V1.4.0 or newer** for the V4L; for the V4, also a current osmocom
+build.
 
 Core options: `--mode am|fm|usb|lsb|cw`, `--squelch -60` (dBFS),
 `--fast-phase auto|on|off`, `--exclude mode|auto|<Hz>|0`, `--gain` (one value
@@ -407,7 +420,10 @@ None of this has been measured on real dongles yet.
   the numbering wizard, or tick *Demo mode* to try without hardware.
 * **"No RTL-SDR found"** (Windows): install WinUSB with Zadig (section 1).
   Windows Update sometimes puts the TV driver back; re-run Zadig.
-* **"not V4 / unsupported"**: rtlnc only works with RTL-SDR Blog V4 dongles.
+* **"unsupported" dongle**: rtlnc only works with RTL-SDR Blog V4 and V4L dongles.
+* **A V4L doesn't work, or HF is dead, in another SDR program**: that program
+  needs RTL-SDR Blog driver V1.4.0 or newer. rtlnc's own installer already
+  includes it.
 * `** WEAK **` at acquisition, or coherence < 0.1: the aux isn't hearing the
   noise that main hears, or the noise was absent at start-up. Re-aim the
   aux, then press *Re-acquire* in the panel.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.3
+- **RTL-SDR Blog V4L (Lite) support.** V4L dongles (USB product "Blog V4L",
+  R828S tuner) are now accepted alongside the V4, in the core, launcher and
+  dongle editor, which shows each dongle's model.
+- The Windows app now bundles RTL-SDR Blog driver **V1.4.0**, the first with
+  V4L support. It still supports the V4 and V3.
+- Dongle editor: V4L serials can be up to 13 characters (14 on a V4).
+- README: V4L notes, including broadcast band-stop filters, because the V4L
+  has less input filtering than the V4.
+
 ## 0.3.2
 - Fix: closing the launcher window could leave rtlnc running invisibly in
   the background (Edge keeps its process alive after the window closes),

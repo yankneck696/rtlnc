@@ -22,7 +22,7 @@ def app_dir() -> str:
 
 
 def _setup_dlls() -> None:
-    """Let pyrtlsdr / ctypes find the bundled RTL-SDR Blog V4 rtlsdr.dll + libusb."""
+    """Let pyrtlsdr / ctypes find the bundled RTL-SDR Blog driver (rtlsdr.dll, V4 + V4L)."""
     if sys.platform != "win32":
         return
     for d in (app_dir(), os.path.join(app_dir(), "rtlsdr")):

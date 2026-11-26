@@ -55,7 +55,7 @@
 </head>
 <body>
 <header>
-  <div class="brand">rtlnc <small>multi-dongle noise canceller · RTL-SDR V4</small></div>
+  <div class="brand">rtlnc <small>multi-dongle noise canceller · RTL-SDR Blog V4 / V4L</small></div>
   <span id="state" class="pill off">stopped</span>
   <div class="spacer"></div>
   <button id="go">▶ Start</button>
@@ -228,7 +228,7 @@ async function refreshDongles(){
   if (!list.length){
     $("dongles").innerHTML = `<div class="warn">No RTL-SDR found. Plug in your V4 dongles. First time on this PC? Install the WinUSB driver for each one with <b>Zadig</b> (Options → List All Devices → "Bulk-In, Interface (Interface 0)" → WinUSB → Install).</div>`; return; }
   const rows = list.map(d => `<tr><td class="mono">${esc(d.serial)}</td><td>${esc(d.name) || '<span class="dim">no name</span>'}</td>
-    <td class="mono">${esc(d.role) || '<span class="dim">—</span>'}</td><td>${d.v4 ? '<span class="pill ok">V4</span>' : '<span class="pill bad">not V4</span>'}</td></tr>`).join("");
+    <td class="mono">${esc(d.role) || '<span class="dim">—</span>'}</td><td>${d.v4 ? `<span class="pill ok">${esc(d.model)}</span>` : `<span class="pill bad" title="${esc(d.model)}">not supported</span>`}</td></tr>`).join("");
   const sers = list.map(d => d.serial), dup = sers.some((s,i) => sers.indexOf(s) !== i);
   const hasMain = list.some(d => d.role === "main"), nAux = list.filter(d => /^aux\d/.test(d.role)).length;
   let msg = "";
